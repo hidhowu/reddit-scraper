@@ -1,64 +1,29 @@
 const express = require("express");
 const helmet = require("helmet");
-const puppeteer = require("puppeteer-extra");
-const CHROME_PATH = process.env.CHROME_PATH || "/usr/bin/chromium-browser";
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-
-puppeteer.use(StealthPlugin());
+const axios = require("axios");
 
 const app = express();
 const PORT = 5050;
-const LOG_OUTPUT = process.env.LOG_OUTPUT === "true";
+const LOG_OUTPUT = "true";
 
 app.use(helmet());
 app.use(express.json());
 
-let browser;
-
-async function launchBrowser() {
-  browser = await puppeteer.launch({
-    headless: true,
-    executablePath: CHROME_PATH,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-blink-features=AutomationControlled",
-    ],
-  });
-  browser.on("disconnected", () => {
-    browser = null;
-  });
-}
-
-async function getBrowser() {
-  if (!browser) await launchBrowser();
-  return browser;
-}
-
 async function scrapeReddit(keyword) {
-  const b = await getBrowser();
-  const page = await b.newPage();
+  const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(keyword)}`;
 
-  try {
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    );
+  const response = await axios.get(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Connection": "keep-alive",
+      "Upgrade-Insecure-Requests": "1",
+    },
+  });
 
-    const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(keyword)}`;
-    const response = await page.goto(url, { waitUntil: "networkidle2" });
-
-    if (!response.ok()) {
-      throw new Error(`Reddit returned status ${response.status()}`);
-    }
-
-    const json = await page.evaluate(() =>
-      JSON.parse(document.querySelector("pre").innerText)
-    );
-
-    return json;
-  } finally {
-    await page.close();
-  }
+  return response.data;
 }
 
 // GET /search?q=your+keyword
@@ -97,17 +62,10 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: "Route not found" });
 });
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Usage: GET http://localhost:${PORT}/search?q=your+keyword`);
   console.log(`Output logging: ${LOG_OUTPUT ? "ON" : "OFF"} (set LOG_OUTPUT=true to enable)`);
-  // Pre-warm the browser
-  await getBrowser();
-  console.log("Browser ready.");
 });
 
-// Graceful shutdown
-process.on("SIGINT", async () => {
-  if (browser) await browser.close();
-  process.exit();
-});
+process.on("SIGINT", () => process.exit());
