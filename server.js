@@ -8,6 +8,7 @@ puppeteer.use(StealthPlugin());
 
 const app = express();
 const PORT = 5050;
+const LOG_OUTPUT = process.env.LOG_OUTPUT === "true";
 
 app.use(helmet());
 app.use(express.json());
@@ -80,6 +81,10 @@ app.get("/search", async (req, res) => {
 
   try {
     const data = await scrapeReddit(keyword.trim());
+    if (LOG_OUTPUT) {
+      console.log(`\n[Reddit Output] keyword="${keyword.trim()}"`);
+      console.log(JSON.stringify(data, null, 2));
+    }
     return res.status(200).json({ success: true, data });
   } catch (err) {
     console.error("Scrape error:", err.message);
@@ -95,6 +100,7 @@ app.use((req, res) => {
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Usage: GET http://localhost:${PORT}/search?q=your+keyword`);
+  console.log(`Output logging: ${LOG_OUTPUT ? "ON" : "OFF"} (set LOG_OUTPUT=true to enable)`);
   // Pre-warm the browser
   await getBrowser();
   console.log("Browser ready.");
