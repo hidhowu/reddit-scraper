@@ -1,6 +1,7 @@
 const express = require("express");
 const helmet = require("helmet");
 const puppeteer = require("puppeteer-extra");
+const CHROME_PATH = process.env.CHROME_PATH || "/usr/bin/chromium-browser";
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 
 puppeteer.use(StealthPlugin());
@@ -16,6 +17,7 @@ let browser;
 async function launchBrowser() {
   browser = await puppeteer.launch({
     headless: true,
+    executablePath: CHROME_PATH,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
